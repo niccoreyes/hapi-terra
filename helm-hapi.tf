@@ -32,15 +32,16 @@ resource "helm_release" "hapi_fhir" {
   for_each = { for mode in local.hapi_modes : mode => mode }
 
   name       = each.key == "terminology" ? "hapi-fhir-terminology" : "hapi-fhir"
-  repository = "https://hapifhir.github.io/hapi-fhir-jpaserver-starter"
-  chart      = "hapi-fhir-jpaserver"
-  version    = var.hapi_chart_version
+  # repository = "https://hapifhir.github.io/hapi-fhir-jpaserver-starter"
+  # chart      = "hapi-fhir-jpaserver"
+  chart = "hapi-fhir-jpaserver-0.21.0.tgz"
+  # version    = var.hapi_chart_version
 
   values = [
     file(local.hapi_values_files[each.key])
   ]
 
-  timeout           = 600
+  timeout           = 1000
   atomic            = true
   dependency_update = true
 }

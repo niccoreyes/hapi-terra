@@ -42,6 +42,17 @@ terraform apply
 
 Set `TF_VAR_` environment variables or create a `terraform.tfvars` file to persist custom values. Key inputs are defined in `variables.tf`.
 
+### Running Terraform directly after using `deploy.bat`
+The automation script writes your answers to `.env` **and** exports the matching `TF_VAR_*` environment variables at the user scope. Open a new terminal and Terraform will automatically pick them up, letting you run without extra flags:
+
+```bash
+terraform plan
+terraform apply
+```
+
+If you tweak values manually, update the corresponding `TF_VAR_` variables (e.g. `set TF_VAR_hapi_mode=both`) or rerun `deploy.bat` so the helpers stay in sync.  
+_On Windows, open a fresh terminal after running `deploy.bat` so the new environment variables take effect._
+
 Before committing changes run:
 
 ```bash

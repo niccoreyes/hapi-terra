@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -29,33 +30,37 @@ DEPENDENCY_COMMANDS = {
 }
 
 
-def prepare_helm_cache(chart_version: str) -> Path:
-    """Ensure Helm caches live in a writable project folder and clear stale archives."""
-    helm_cache_root = Path.cwd() / ".helm-cache"
-    repository_cache = helm_cache_root / "repository"
-    repository_cache.mkdir(parents=True, exist_ok=True)
+def ensure_local_chart(chart_version: str) -> Path:
+    """Download the HAPI FHIR Helm chart archive next to the Terraform configs."""
+    chart_filename = f"hapi-fhir-jpaserver-{chart_version}.tgz"
+    chart_path = Path.cwd() / chart_filename
+    if chart_path.exists():
+        print(f"Found existing Helm chart archive: {chart_filename}")
+        return chart_path
 
-    os.environ.setdefault("HELM_CACHE_HOME", str(helm_cache_root))
-    os.environ.setdefault("HELM_REPOSITORY_CACHE", str(repository_cache))
+    chart_url = (
+        "https://github.com/hapifhir/hapi-fhir-jpaserver-starter/"
+        f"releases/download/helm-v{chart_version}/{chart_filename}"
+    )
 
-    purge_cached_chart(repository_cache, chart_version)
-    return repository_cache
+    curl_binary = shutil.which("curl.exe") or shutil.which("curl")
+    if not curl_binary:
+        print(
+            "curl.exe is required to download the Helm chart automatically. "
+            "Install curl or download the archive manually and rerun the script."
+        )
+        sys.exit(1)
 
+    print(f"Downloading HAPI FHIR Helm chart {chart_version}...")
+    download_rc = run_streamed(
+        [curl_binary, "-L", "-o", str(chart_path), chart_url]
+    )
+    if download_rc != 0 or not chart_path.exists():
+        print("❌ Failed to download the Helm chart archive. Check network access and retry.")
+        sys.exit(download_rc if download_rc != 0 else 1)
 
-def purge_cached_chart(cache_dir: Path, chart_version: str) -> None:
-    chart_glob = f"hapi-fhir-jpaserver-{chart_version}.tgz*"
-    removed_any = False
-    for cached in cache_dir.glob(chart_glob):
-        try:
-            cached.unlink()
-            removed_any = True
-        except PermissionError:
-            print(
-                f"Warning: unable to clean cached Helm chart {cached}. "
-                "Close tools that may be locking the file and re-run if Terraform fails."
-            )
-    if removed_any:
-        print("Cleared stale Helm chart cache to avoid Windows file locking issues.")
+    print(f"Saved Helm chart archive to {chart_filename}.")
+    return chart_path
 
 
 def list_key_pairs(region: str):
@@ -230,7 +235,19 @@ def main():
     os.environ.update(updated_env)
 
     os.environ["HAPI_CHART_VERSION"] = chart_version
-    prepare_helm_cache(chart_version)
+    ensure_local_chart(chart_version)
+
+    tf_var_exports = {
+        "TF_VAR_aws_region": aws_region,
+        "TF_VAR_cluster_name": cluster_name,
+        "TF_VAR_environment": environment,
+        "TF_VAR_hapi_mode": hapi_mode,
+        "TF_VAR_ssh_key_name": ssh_key,
+        "TF_VAR_k8s_version": k8s_version,
+        "TF_VAR_hapi_chart_version": chart_version,
+    }
+    os.environ.update(tf_var_exports)
+    set_env_persistent(tf_var_exports)
 
     terraform_init_rc = run_streamed(["terraform", "init"])
     if terraform_init_rc != 0:

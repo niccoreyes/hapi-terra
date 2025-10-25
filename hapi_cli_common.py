@@ -40,7 +40,7 @@ def ensure_dependency(name: str, install_command: str) -> None:
 
 def set_env_persistent(pairs: Dict[str, str]) -> None:
     for key, value in pairs.items():
-        if value is None:
+        if value is None or value == "":
             continue
         subprocess.run(["setx", key, value], check=False)
         os.environ[key] = value
