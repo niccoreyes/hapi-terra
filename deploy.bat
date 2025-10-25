@@ -153,7 +153,7 @@ if defined EXISTING_DEPLOYMENT (
         exit /b 0
     )
 )
-set "DUPLICATE_MSG="
+set "DUPLICATE_WARNED="
 
 echo Choose HAPI FHIR deployment mode:
 echo   1 - General FHIR Server (default)

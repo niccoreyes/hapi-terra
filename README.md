@@ -21,10 +21,12 @@ Provision an Amazon EKS cluster and deploy the HAPI FHIR JPA server using Terraf
 2. Run `deploy.bat` and respond to the prompts:
    - AWS access key ID and secret access key (stored locally in `.env` for reuse and exported to your user environment).
    - AWS region (defaults to `us-east-1` if left blank).
+   - EKS cluster name (defaults to `hapi-eks-cluster`; stored in `.env` and passed to Terraform).
    - Optional EC2 key pair name. The script lists existing key pairs in the selected region so you can pick one or press Enter to skip SSH access.
    - Environment tag (defaults to `dev`).
    - HAPI deployment mode (`general`, `terminology`, or `both`). The selection determines which Helm value files are applied.
-3. Wait for `terraform init` and `terraform apply` to complete. On success the script reminds you to run `kubectl get svc -A` to discover the HAPI load balancer address.
+3. The script checks whether an EKS cluster with that name already exists and, if found, asks whether to continue so Terraform can reconcile the existing stack.
+4. Wait for `terraform init` and `terraform apply` to complete. On success the script reminds you to run `kubectl get svc -A` to discover the HAPI load balancer address.
 
 ### Destroying the Environment
 Run `destroy.bat` from the same directory. The script reuses values from `.env`, confirms the action, and runs `terraform destroy`.
