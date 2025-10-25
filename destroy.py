@@ -10,8 +10,6 @@ from hapi_cli_common import (
     load_env,
     prompt,
     run_streamed,
-    save_env,
-    set_env_persistent,
 )
 
 
@@ -88,15 +86,6 @@ def main():
         "K8S_VERSION": k8s_version,
     }
 
-    save_env(updated_env)
-    set_env_persistent(
-        {
-            "AWS_ACCESS_KEY_ID": aws_access_key,
-            "AWS_SECRET_ACCESS_KEY": aws_secret_key,
-            "AWS_DEFAULT_REGION": aws_region,
-            "CLUSTER_NAME": cluster_name,
-        }
-    )
     os.environ.update(updated_env)
 
     terraform_destroy_cmd = [
