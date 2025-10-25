@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List
 
 ENV_FILE = Path(".env")
-MIN_K8S_VERSION = "1.31"
+MIN_K8S_VERSION = "1.32"
 
 
 def load_env() -> Dict[str, str]:

@@ -33,6 +33,7 @@ locals {
     capacity_type         = "ON_DEMAND"
     ami_type              = "AL2_x86_64"
     create_launch_template = local.eks_remote_access == null
+    use_custom_launch_template = local.eks_remote_access == null
     remote_access         = local.eks_remote_access
   }
 }
