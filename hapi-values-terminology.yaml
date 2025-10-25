@@ -1,12 +1,17 @@
+
 replicaCount: 1
+
+# ensure Kubernetes resource names are unique for this release
+fullnameOverride: "hapi-fhir-terminology"
 
 image:
   repository: hapiproject/hapi
   tag: v8.2.0-1
   pullPolicy: IfNotPresent
 
+# OPTIONAL: use ClusterIP to avoid provisioning a second cloud LoadBalancer
 service:
-  type: LoadBalancer
+  type: ClusterIP
   port: 8080
 
 resources:
@@ -28,3 +33,8 @@ extraEnv:
     value: "Terminology Server"
   - name: "HAPI_FHIR_IMPLEMENTATION_DESCRIPTION"
     value: "Terminology-focused FHIR server with limited resources."
+
+# make embedded Postgres database name explicit for this release
+postgresql:
+  auth:
+    database: "fhir_terminology"

@@ -21,21 +21,20 @@ module "vpc" {
 data "aws_availability_zones" "available" {}
 
 locals {
-  eks_node_group = merge(
-    {
-      desired_size   = var.node_desired_capacity
-      max_size       = var.node_max_capacity
-      min_size       = var.node_min_capacity
-      instance_types = [var.node_instance_type]
-      capacity_type  = "ON_DEMAND"
-      ami_type       = "AL2_x86_64"
-    },
-    var.ssh_key_name != "" ? {
-      remote_access = {
-        ec2_ssh_key = var.ssh_key_name
-      }
-    } : {}
-  )
+  eks_remote_access = var.ssh_key_name != "" ? {
+    ec2_ssh_key = var.ssh_key_name
+  } : null
+
+  eks_node_group = {
+    desired_size          = var.node_desired_capacity
+    max_size              = var.node_max_capacity
+    min_size              = var.node_min_capacity
+    instance_types        = [var.node_instance_type]
+    capacity_type         = "ON_DEMAND"
+    ami_type              = "AL2_x86_64"
+    create_launch_template = local.eks_remote_access == null
+    remote_access         = local.eks_remote_access
+  }
 }
 
 module "eks" {

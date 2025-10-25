@@ -1,5 +1,8 @@
 replicaCount: 1
 
+# ensure Kubernetes resource names are unique for this release
+fullnameOverride: "hapi-fhir-general"
+
 image:
   repository: hapiproject/hapi
   tag: v8.2.0-1
@@ -24,3 +27,8 @@ extraEnv:
     value: "60000"
   - name: "HAPI_FHIR_SERVER_ADDRESS"
     value: "http://0.0.0.0:8080/fhir"
+
+# make embedded Postgres database name explicit for this release
+postgresql:
+  auth:
+    database: "fhir_general"
