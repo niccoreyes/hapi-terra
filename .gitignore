@@ -1,0 +1,22 @@
+# Terraform state and caches
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Local configuration overrides
+terraform.tfvars
+terraform.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Environment secrets
+.env
+.env.*
+
+# Editor and OS clutter
+.DS_Store
+Thumbs.db
