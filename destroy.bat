@@ -33,14 +33,32 @@ if /i not "%CONFIRM%"=="DESTROY" (
     exit /b 0
 )
 
-if "%AWS_ACCESS_KEY_ID%"=="" (
-    echo AWS credentials not found in environment.
-    echo AWS Access Key ID (find in AWS Console ^> IAM ^> Users ^> your user ^> Security credentials ^> Access keys)
+set "AWS_ACCESS_KEY_ID_DEFAULT=%AWS_ACCESS_KEY_ID%"
+set "AWS_SECRET_ACCESS_KEY_DEFAULT=%AWS_SECRET_ACCESS_KEY%"
+set "AWS_DEFAULT_REGION_DEFAULT=%AWS_DEFAULT_REGION%"
+
+echo AWS Access Key ID (find in AWS Console ^> IAM ^> Users ^> your user ^> Security credentials ^> Access keys)
+if defined AWS_ACCESS_KEY_ID_DEFAULT (
+    set /p AWS_ACCESS_KEY_ID=Enter AWS Access Key ID [%AWS_ACCESS_KEY_ID_DEFAULT%]: 
+    if "%AWS_ACCESS_KEY_ID%"=="" set AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID_DEFAULT%
+) else (
     set /p AWS_ACCESS_KEY_ID=Enter AWS Access Key ID: 
-    echo AWS Secret Access Key (shown once at key creation; generate a new key in IAM if needed)
+)
+
+echo AWS Secret Access Key (shown once at key creation; generate a new key in IAM if needed)
+if defined AWS_SECRET_ACCESS_KEY_DEFAULT (
+    set /p AWS_SECRET_ACCESS_KEY=Enter AWS Secret Access Key [stored]: 
+    if "%AWS_SECRET_ACCESS_KEY%"=="" set AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY_DEFAULT%
+) else (
     set /p AWS_SECRET_ACCESS_KEY=Enter AWS Secret Access Key: 
-    echo AWS region code (match the region used during deploy; default us-east-1)
-    set /p AWS_DEFAULT_REGION=Enter AWS region: 
+)
+
+echo AWS region code (match the region used during deploy; default us-east-1)
+if defined AWS_DEFAULT_REGION_DEFAULT (
+    set /p AWS_DEFAULT_REGION=Enter AWS region [%AWS_DEFAULT_REGION_DEFAULT%]: 
+    if "%AWS_DEFAULT_REGION%"=="" set AWS_DEFAULT_REGION=%AWS_DEFAULT_REGION_DEFAULT%
+) else (
+    set /p AWS_DEFAULT_REGION=Enter AWS region [us-east-1]: 
     if "%AWS_DEFAULT_REGION%"=="" set AWS_DEFAULT_REGION=us-east-1
 )
 if "%AWS_DEFAULT_REGION%"=="" set AWS_DEFAULT_REGION=us-east-1
