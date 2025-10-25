@@ -20,31 +20,39 @@ module "vpc" {
 
 data "aws_availability_zones" "available" {}
 
+locals {
+  eks_node_group = merge(
+    {
+      desired_size   = var.node_desired_capacity
+      max_size       = var.node_max_capacity
+      min_size       = var.node_min_capacity
+      instance_types = [var.node_instance_type]
+      capacity_type  = "ON_DEMAND"
+      ami_type       = "AL2_x86_64"
+    },
+    var.ssh_key_name != "" ? {
+      remote_access = {
+        ec2_ssh_key = var.ssh_key_name
+      }
+    } : {}
+  )
+}
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = ">= 19.0"
+  version = "~> 21.0"
 
-  cluster_name    = var.cluster_name
-  cluster_version = var.k8s_version
-  subnets         = module.vpc.private_subnets
-  vpc_id          = module.vpc.vpc_id
+  name               = var.cluster_name
+  kubernetes_version = var.k8s_version
+  vpc_id                          = module.vpc.vpc_id
+  subnet_ids                      = module.vpc.private_subnets
+  enable_cluster_creator_admin_permissions = true
 
-  node_groups = {
-    default = {
-      desired_capacity = var.node_desired_capacity
-      max_capacity     = var.node_max_capacity
-      min_capacity     = var.node_min_capacity
-
-      instance_types = [var.node_instance_type]
-      key_name       = var.ssh_key_name
-
-      asg_desired_capacity = var.node_desired_capacity
-    }
+  eks_managed_node_groups = {
+    default = local.eks_node_group
   }
 
   tags = {
     Environment = var.environment
   }
-
-  manage_aws_auth = true
 }

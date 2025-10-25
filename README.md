@@ -51,6 +51,7 @@ terraform validate
 
 ## Customizing the Deployment
 - Edit `variables.tf` (or override via `.tfvars`) to adjust instance type, node scaling, cluster name, and HAPI chart version.
+- Provide an EC2 key pair name if you need SSH access to the EKS managed node group. The Terraform module wires that key into the managed node group’s remote access configuration.
 - Modify `hapi-values-general.yaml` or `hapi-values-terminology.yaml` to tune application-level configuration. The YAML files map 1:1 with the chart structure—keep keys lowercase with hyphenated file naming.
 - To enable both HAPI profiles at once, set `hapi_mode = "both"` (supported in the CLI prompts and Terraform variables).
 

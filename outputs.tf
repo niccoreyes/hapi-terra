@@ -1,10 +1,17 @@
 output "cluster_name" {
-  value = module.eks.cluster_id
+  value       = module.eks.cluster_name
+  description = "EKS cluster name."
 }
 
-output "kubeconfig" {
-  value       = module.eks.kubeconfig
-  description = "Kubeconfig (raw). Use aws eks update-kubeconfig instead for direct use."
+output "cluster_endpoint" {
+  value       = module.eks.cluster_endpoint
+  description = "EKS control plane endpoint URL."
+}
+
+output "cluster_certificate_authority_data" {
+  value       = module.eks.cluster_certificate_authority_data
+  description = "Base64-encoded cluster CA certificate."
+  sensitive   = true
 }
 
 output "hapi_service" {
