@@ -32,7 +32,7 @@ resource "helm_release" "hapi_fhir" {
   for_each = { for mode in local.hapi_modes : mode => mode }
 
   name       = each.key == "terminology" ? "hapi-fhir-terminology" : "hapi-fhir"
-  repository = "https://chgl.github.io/charts"
+  repository = "https://hapifhir.github.io/hapi-fhir-jpaserver-starter"
   chart      = "hapi-fhir-jpaserver"
   version    = var.hapi_chart_version
 

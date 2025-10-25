@@ -29,6 +29,35 @@ DEPENDENCY_COMMANDS = {
 }
 
 
+def prepare_helm_cache(chart_version: str) -> Path:
+    """Ensure Helm caches live in a writable project folder and clear stale archives."""
+    helm_cache_root = Path.cwd() / ".helm-cache"
+    repository_cache = helm_cache_root / "repository"
+    repository_cache.mkdir(parents=True, exist_ok=True)
+
+    os.environ.setdefault("HELM_CACHE_HOME", str(helm_cache_root))
+    os.environ.setdefault("HELM_REPOSITORY_CACHE", str(repository_cache))
+
+    purge_cached_chart(repository_cache, chart_version)
+    return repository_cache
+
+
+def purge_cached_chart(cache_dir: Path, chart_version: str) -> None:
+    chart_glob = f"hapi-fhir-jpaserver-{chart_version}.tgz*"
+    removed_any = False
+    for cached in cache_dir.glob(chart_glob):
+        try:
+            cached.unlink()
+            removed_any = True
+        except PermissionError:
+            print(
+                f"Warning: unable to clean cached Helm chart {cached}. "
+                "Close tools that may be locking the file and re-run if Terraform fails."
+            )
+    if removed_any:
+        print("Cleared stale Helm chart cache to avoid Windows file locking issues.")
+
+
 def list_key_pairs(region: str):
     result = run_captured(
         [
@@ -174,6 +203,8 @@ def main():
     hapi_mode = choose_hapi_mode(env_values.get("HAPI_MODE", "general"))
     print(f"Selected mode: {hapi_mode}")
 
+    chart_version = env_values.get("HAPI_CHART_VERSION", "0.21.0")
+
     updated_env = {
         "AWS_ACCESS_KEY_ID": aws_access_key,
         "AWS_SECRET_ACCESS_KEY": aws_secret_key,
@@ -184,6 +215,7 @@ def main():
         "ENVIRONMENT": environment,
         "HAPI_MODE": hapi_mode,
         "K8S_VERSION": k8s_version,
+        "HAPI_CHART_VERSION": chart_version,
     }
 
     save_env(updated_env)
@@ -196,6 +228,9 @@ def main():
         }
     )
     os.environ.update(updated_env)
+
+    os.environ["HAPI_CHART_VERSION"] = chart_version
+    prepare_helm_cache(chart_version)
 
     terraform_init_rc = run_streamed(["terraform", "init"])
     if terraform_init_rc != 0:
@@ -212,6 +247,7 @@ def main():
         f'-var=hapi_mode={hapi_mode}',
         f'-var=cluster_name={cluster_name}',
         f'-var=k8s_version={k8s_version}',
+        f'-var=hapi_chart_version={chart_version}',
     ]
 
     apply_rc = run_streamed(terraform_apply_cmd)

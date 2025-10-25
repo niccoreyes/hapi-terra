@@ -1,8 +1,8 @@
 replicaCount: 1
 
 image:
-  repository: hapiproject/hapi-fhir-jpaserver-starter
-  tag: latest
+  repository: hapiproject/hapi
+  tag: v8.2.0-1
   pullPolicy: IfNotPresent
 
 service:

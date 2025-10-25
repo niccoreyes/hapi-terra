@@ -5,7 +5,7 @@ Provision an Amazon EKS cluster and deploy the HAPI FHIR JPA server using Terraf
 ## What Gets Deployed
 - **Networking:** A dedicated VPC with public and private subnets, NAT gateway, and opinionated CIDR blocks via the `terraform-aws-modules/vpc` module.
 - **Compute:** An EKS control plane with managed node group sized by Terraform variables, created through the `terraform-aws-modules/eks` module.
-- **Application:** HAPI FHIR Helm releases sourced from `https://chgl.github.io/charts`, with overrides split between `hapi-values-general.yaml` and `hapi-values-terminology.yaml`.
+- **Application:** HAPI FHIR Helm releases sourced from `https://hapifhir.github.io/hapi-fhir-jpaserver-starter/`, with overrides split between `hapi-values-general.yaml` and `hapi-values-terminology.yaml`.
 
 ## Prerequisites
 - Terraform >= 1.2
@@ -82,7 +82,9 @@ terraform validate
 - **No EC2 key pairs listed.**  
   Ensure the AWS CLI can access the selected region. Create a new key pair in AWS Console > EC2 > Key Pairs if you require SSH access.
 - **`helm_release` fails with timeout.**  
-  Check EKS node readiness (`kubectl get nodes`) and confirm the Helm repository (`https://chgl.github.io/charts`) is reachable. Re-run `terraform apply` once connectivity is restored.
+  Check EKS node readiness (`kubectl get nodes`) and confirm the Helm repository (`https://hapifhir.github.io/hapi-fhir-jpaserver-starter/`) is reachable. Re-run `terraform apply` once connectivity is restored.
+- **`Access is denied` while downloading `hapi-fhir-jpaserver-<version>.tgz`.**  
+  Windows can lock Helm’s cached chart archive between runs. The automation script now clears `.helm-cache/`, but when running Terraform manually delete the cached file under `%TEMP%\helm\repository\` (e.g. `hapi-fhir-jpaserver-0.21.0.tgz`) before retrying.
 - **Authentication errors with `aws eks update-kubeconfig`.**  
   Verify your IAM user or role is mapped in the EKS `aws-auth` ConfigMap. The Terraform module enables default mappings, but custom restrictions may require manual updates.
 

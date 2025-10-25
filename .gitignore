@@ -24,3 +24,6 @@ Thumbs.db
 # Python virtual environment
 .venv/
 __pycache__/
+
+# Local Helm cache created by automation script
+.helm-cache/

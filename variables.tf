@@ -49,9 +49,9 @@ variable "environment" {
 }
 
 variable "hapi_chart_version" {
-  description = "Helm chart version for hapi-fhir-jpaserver in the chgl repo"
+  description = "Helm chart version for hapi-fhir-jpaserver from the official hapifhir repo"
   type        = string
-  default     = "1.0.0"
+  default     = "0.21.0"
 }
 
 variable "hapi_mode" {
