@@ -2,7 +2,7 @@
 setlocal
 title HAPI FHIR Terraform Destroy
 echo ===============================================
-echo   HAPI FHIR - AWS EKS Terraform Destroy
+echo  HAPI FHIR - AWS EKS Terraform - BATCH SCRIPT
 echo ===============================================
 
 where python >nul 2>&1

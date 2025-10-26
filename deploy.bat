@@ -2,7 +2,7 @@
 setlocal
 title HAPI FHIR Terraform Deployment
 echo ===============================================
-echo   HAPI FHIR - AWS EKS Terraform Deployment
+echo  HAPI FHIR - AWS EKS Terraform - BATCH SCRIPT
 echo ===============================================
 
 where python >nul 2>&1

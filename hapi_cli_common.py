@@ -1,4 +1,5 @@
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -7,6 +8,23 @@ from typing import Dict, List
 
 ENV_FILE = Path(".env")
 MIN_K8S_VERSION = "1.32"
+
+_RESET = "\033[0m"
+_TAG_COLORS = {
+    "CMD": "\033[95m",
+    "OUT": "\033[92m",
+    "ERR": "\033[91m",
+    "EXIT": "\033[93m",
+}
+
+try:
+    if os.name == "nt":
+        import colorama
+
+        colorama.just_fix_windows_console()
+    _USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR", "")
+except ImportError:
+    _USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR", "")
 
 
 def load_env() -> Dict[str, str]:
@@ -30,11 +48,10 @@ def ensure_dependency(name: str, install_command: str) -> None:
     if shutil.which(name):
         return
     print(f"{name} not found. Installing via Chocolatey...")
-    result = subprocess.run(
-        ["powershell", "-NoProfile", "-Command", install_command],
-        check=False,
+    rc = run_streamed(
+        ["powershell", "-NoProfile", "-Command", install_command]
     )
-    if result.returncode != 0 or not shutil.which(name):
+    if rc != 0 or not shutil.which(name):
         print(f"WARNING: {name} is still unavailable. Install it manually and rerun.")
 
 
@@ -42,7 +59,7 @@ def set_env_persistent(pairs: Dict[str, str]) -> None:
     for key, value in pairs.items():
         if value is None or value == "":
             continue
-        subprocess.run(["setx", key, value], check=False)
+        run_streamed(["setx", key, value])
         os.environ[key] = value
 
 
@@ -86,23 +103,61 @@ def enforce_min_k8s_version(requested: str) -> str:
     return candidate
 
 
+def _format_command(command: List[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
+
+
+def _tag(label: str) -> str:
+    color = _TAG_COLORS.get(label)
+    if color and _USE_COLOR:
+        return f"{color}[{label}]{_RESET}"
+    return f"[{label}]"
+
+
 def run_streamed(command: List[str]) -> int:
-    process = subprocess.Popen(command, text=True)
+    print(f"{_tag('CMD')} {_format_command(command)}", flush=True)
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
     try:
-        return process.wait()
+        if process.stdout is not None:
+            for raw_line in process.stdout:
+                line = raw_line.rstrip("\r\n")
+                print(f"{_tag('OUT')} {line}")
     except KeyboardInterrupt:
         process.terminate()
-        return process.wait()
+        rc = process.wait()
+        print(f"{_tag('EXIT')} {rc}")
+        return rc
+    finally:
+        if process.stdout is not None:
+            process.stdout.close()
+    rc = process.wait()
+    print(f"{_tag('EXIT')} {rc}")
+    return rc
 
 
 def run_captured(command: List[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(
+    print(f"{_tag('CMD')} {_format_command(command)}", flush=True)
+    result = subprocess.run(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         check=False,
     )
+    if result.stdout:
+        for line in result.stdout.splitlines():
+            print(f"{_tag('OUT')} {line.rstrip()}")
+    if result.stderr:
+        for line in result.stderr.splitlines():
+            print(f"{_tag('ERR')} {line.rstrip()}")
+    print(f"{_tag('EXIT')} {result.returncode}")
+    return result
 
 
 def confirm_destruction() -> bool:
