@@ -6,9 +6,19 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-ENV_FILE = Path(".env")
+TF_AUTOVARS_FILE = Path("terraform.auto.tfvars")
+_MANAGED_TFVAR_KEYS = {
+    "aws_region",
+    "cluster_name",
+    "environment",
+    "hapi_mode",
+    "ssh_key_name",
+    "k8s_version",
+    "hapi_chart_version",
+    "node_ami_type",
+}
 # Keep aligned with the highest Kubernetes version Amazon EKS currently supports.
-MIN_K8S_VERSION = "1.29"
+MIN_K8S_VERSION = "1.33"
 
 _RESET = "\033[0m"
 _TAG_COLORS = {
@@ -28,21 +38,84 @@ except ImportError:
     _USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR", "")
 
 
-def load_env() -> Dict[str, str]:
+def load_tfvars() -> Dict[str, str]:
     values: Dict[str, str] = {}
-    if ENV_FILE.exists():
-        for raw_line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            values[key.strip()] = value.strip()
+    if not TF_AUTOVARS_FILE.exists():
+        return values
+
+    for raw_line in TF_AUTOVARS_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key_part, value_part = line.split("=", 1)
+        key = key_part.strip()
+        value = value_part.split("#", 1)[0].strip()
+
+        if value.endswith(","):
+            value = value[:-1].rstrip()
+
+        if value.startswith('"') and value.endswith('"'):
+            inner = value[1:-1]
+            inner = inner.replace("\\\\", "\\").replace('\\"', '"')
+            values[key] = inner
+        elif value.startswith("'") and value.endswith("'"):
+            values[key] = value[1:-1]
+        else:
+            values[key] = value
     return values
 
 
-def save_env(values: Dict[str, str]) -> None:
-    lines = [f"{key}={values.get(key, '')}" for key in sorted(values)]
-    ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+def _format_tfvar_value(value: str) -> str:
+    if value is None:
+        value = ""
+    escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
+def save_tfvars(values: Dict[str, str]) -> None:
+    managed_updates = {
+        key: values[key]
+        for key in _MANAGED_TFVAR_KEYS
+        if key in values and values[key] is not None
+    }
+
+    existing_lines = []
+    if TF_AUTOVARS_FILE.exists():
+        existing_lines = TF_AUTOVARS_FILE.read_text(encoding="utf-8").splitlines()
+
+    if not managed_updates and not existing_lines:
+        if TF_AUTOVARS_FILE.exists():
+            TF_AUTOVARS_FILE.unlink()
+        return
+
+    updated_lines = []
+    handled_keys = set()
+    for raw_line in existing_lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            updated_lines.append(raw_line)
+            continue
+
+        key_candidate, _ = stripped.split("=", 1)
+        key = key_candidate.strip()
+        if key in managed_updates:
+            updated_lines.append(f"{key} = {_format_tfvar_value(managed_updates[key])}")
+            handled_keys.add(key)
+        else:
+            updated_lines.append(raw_line)
+
+    for key in sorted(managed_updates):
+        if key in handled_keys:
+            continue
+        updated_lines.append(f"{key} = {_format_tfvar_value(managed_updates[key])}")
+
+    if not updated_lines:
+        if TF_AUTOVARS_FILE.exists():
+            TF_AUTOVARS_FILE.unlink()
+        return
+
+    TF_AUTOVARS_FILE.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
 
 
 def ensure_dependency(name: str, install_command: str) -> None:

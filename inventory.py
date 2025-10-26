@@ -1,3 +1,4 @@
+import os
 import sys
 from typing import Dict, Iterable, List, Optional
 
@@ -8,7 +9,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
     print("boto3 is required to run inventory.py. Install it with `pip install boto3`.")
     raise SystemExit(1) from exc
 
-from hapi_cli_common import ensure_python_version, load_env, prompt
+from hapi_cli_common import ensure_python_version, load_tfvars, prompt
 
 
 def tag_dict(tag_input: Optional[Iterable[Dict[str, str]]]) -> Dict[str, str]:
@@ -340,20 +341,23 @@ def show_cloudwatch_logs(session, cluster_name: Optional[str]) -> None:
 
 def main() -> None:
     ensure_python_version()
-    env = load_env()
+    tf_values = load_tfvars()
 
     cluster_name = prompt(
         "Cluster name to inspect (Enter to list all clusters)",
-        env.get("CLUSTER_NAME", ""),
+        tf_values.get("cluster_name", ""),
     )
     env_tag = prompt(
         "Environment tag filter (Enter to include all)",
-        env.get("ENVIRONMENT", ""),
+        tf_values.get("environment", ""),
     )
     env_tag = env_tag or None
     region = prompt(
         "AWS region (default us-east-1)",
-        env.get("AWS_REGION") or env.get("AWS_DEFAULT_REGION", "us-east-1"),
+        tf_values.get("aws_region")
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1",
     ) or "us-east-1"
 
     session = boto3.Session(region_name=region)

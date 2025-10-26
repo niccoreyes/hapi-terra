@@ -7,9 +7,10 @@ from hapi_cli_common import (
     enforce_min_k8s_version,
     ensure_dependency,
     ensure_python_version,
-    load_env,
+    load_tfvars,
     prompt,
     run_streamed,
+    save_tfvars,
 )
 
 
@@ -29,7 +30,7 @@ def main():
     print("  HAPI FHIR - AWS EKS Terraform Destroy")
     print("===============================================")
 
-    env_values = load_env()
+    tf_values = load_tfvars()
 
     for name, command in DEPENDENCY_COMMANDS.items():
         ensure_dependency(name, command)
@@ -42,37 +43,38 @@ def main():
     aws_access_key = prompt(
         "AWS Access Key ID (find in AWS Console > IAM > Users > your user > "
         "Security credentials > Access keys",
-        env_values.get("AWS_ACCESS_KEY_ID", ""),
+        os.environ.get("AWS_ACCESS_KEY_ID", ""),
     )
 
     secret_prompt_display = (
-        "stored" if env_values.get("AWS_SECRET_ACCESS_KEY") else ""
+        "stored" if os.environ.get("AWS_SECRET_ACCESS_KEY") else ""
     )
     aws_secret_key = prompt(
         "AWS Secret Access Key (shown once at key creation; generate a new key in IAM "
         "if needed",
-        env_values.get("AWS_SECRET_ACCESS_KEY", ""),
+        os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
         display_default=secret_prompt_display,
     )
 
-    region_default = env_values.get("AWS_REGION") or env_values.get(
-        "AWS_DEFAULT_REGION", "us-east-1"
+    region_default = (
+        tf_values.get("aws_region")
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1"
     )
     aws_region = prompt(
         "AWS region code (match the region used during deploy; default us-east-1",
         region_default,
     ) or "us-east-1"
 
-    cluster_default = env_values.get("CLUSTER_NAME", "hapi-eks-cluster")
+    cluster_default = tf_values.get("cluster_name", "hapi-eks-cluster")
     cluster_name = prompt(
         "EKS cluster name to destroy (defaults to hapi-eks-cluster if not saved",
         cluster_default,
     ) or "hapi-eks-cluster"
 
-    hapi_mode = env_values.get("HAPI_MODE", "general")
-    k8s_version = enforce_min_k8s_version(
-        env_values.get("K8S_VERSION", MIN_K8S_VERSION)
-    )
+    hapi_mode = tf_values.get("hapi_mode", "general")
+    k8s_version = enforce_min_k8s_version(tf_values.get("k8s_version", MIN_K8S_VERSION))
 
     updated_env = {
         "AWS_ACCESS_KEY_ID": aws_access_key,
@@ -80,13 +82,24 @@ def main():
         "AWS_DEFAULT_REGION": aws_region,
         "AWS_REGION": aws_region,
         "CLUSTER_NAME": cluster_name,
-        "SSH_KEY_NAME": env_values.get("SSH_KEY_NAME", ""),
-        "ENVIRONMENT": env_values.get("ENVIRONMENT", "dev"),
+        "SSH_KEY_NAME": tf_values.get("ssh_key_name", ""),
+        "ENVIRONMENT": tf_values.get("environment", "dev"),
         "HAPI_MODE": hapi_mode,
         "K8S_VERSION": k8s_version,
     }
 
     os.environ.update(updated_env)
+    tf_values.update(
+        {
+            "aws_region": aws_region,
+            "cluster_name": cluster_name,
+            "environment": updated_env["ENVIRONMENT"],
+            "hapi_mode": hapi_mode,
+            "ssh_key_name": updated_env["SSH_KEY_NAME"],
+            "k8s_version": k8s_version,
+        }
+    )
+    save_tfvars(tf_values)
 
     terraform_destroy_cmd = [
         "terraform",

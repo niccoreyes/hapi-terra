@@ -22,7 +22,8 @@ data "aws_availability_zones" "available" {}
 
 locals {
   k8s_version_numeric  = tonumber(replace(var.k8s_version, ".", ""))
-  eks_default_ami_type = local.k8s_version_numeric >= 133 ? "AL2023_x86_64_STANDARD" : "AL2_x86_64"
+  # Default to AL2023 going forward; fall back to AL2 for pre-1.28 clusters.
+  eks_default_ami_type = local.k8s_version_numeric >= 128 ? "AL2023_x86_64_STANDARD" : "AL2_x86_64"
   eks_node_ami_type    = var.node_ami_type != "" ? var.node_ami_type : local.eks_default_ami_type
 
   eks_remote_access = var.ssh_key_name != "" ? {
@@ -64,6 +65,7 @@ module "eks" {
       most_recent = true
     }
     vpc-cni = {
+      before_compute              = true
       most_recent                 = true
       resolve_conflicts_on_create = "OVERWRITE"
       resolve_conflicts_on_update = "OVERWRITE"

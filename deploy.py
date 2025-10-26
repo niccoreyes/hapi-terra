@@ -4,16 +4,15 @@ import sys
 from pathlib import Path
 
 from hapi_cli_common import (
-    ENV_FILE,
     MIN_K8S_VERSION,
     enforce_min_k8s_version,
     ensure_dependency,
     ensure_python_version,
-    load_env,
+    load_tfvars,
     prompt,
     run_captured,
     run_streamed,
-    save_env,
+    save_tfvars,
     set_env_persistent,
 )
 
@@ -132,7 +131,7 @@ def main():
     print("  HAPI FHIR - AWS EKS Terraform Deployment")
     print("===============================================")
 
-    env_values = load_env()
+    tf_values = load_tfvars()
 
     print("Checking dependencies...")
     for name, command in DEPENDENCY_COMMANDS.items():
@@ -142,21 +141,24 @@ def main():
     aws_access_key = prompt(
         "AWS Access Key ID (find in AWS Console > IAM > Users > your user > "
         "Security credentials > Access keys",
-        env_values.get("AWS_ACCESS_KEY_ID", ""),
+        os.environ.get("AWS_ACCESS_KEY_ID", ""),
     )
 
     secret_prompt_display = (
-        "stored" if env_values.get("AWS_SECRET_ACCESS_KEY") else ""
+        "stored" if os.environ.get("AWS_SECRET_ACCESS_KEY") else ""
     )
     aws_secret_key = prompt(
         "AWS Secret Access Key (shown once when creating the key; create a new key in "
         "the same IAM screen if needed",
-        env_values.get("AWS_SECRET_ACCESS_KEY", ""),
+        os.environ.get("AWS_SECRET_ACCESS_KEY", ""),
         display_default=secret_prompt_display,
     )
 
-    region_default = env_values.get("AWS_REGION") or env_values.get(
-        "AWS_DEFAULT_REGION", "us-east-1"
+    region_default = (
+        tf_values.get("aws_region")
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1"
     )
     aws_region = prompt(
         "AWS region code (matches the region selector in the AWS Console toolbar; "
@@ -164,14 +166,14 @@ def main():
         region_default,
     ) or "us-east-1"
 
-    cluster_default = env_values.get("CLUSTER_NAME", "hapi-eks-cluster")
+    cluster_default = tf_values.get("cluster_name", "hapi-eks-cluster")
     cluster_name = prompt(
         "EKS cluster name (used for the Terraform-managed EKS control plane; "
         "default hapi-eks-cluster",
         cluster_default,
     ) or "hapi-eks-cluster"
 
-    k8s_default = env_values.get("K8S_VERSION", MIN_K8S_VERSION)
+    k8s_default = tf_values.get("k8s_version", MIN_K8S_VERSION)
     raw_k8s_version = prompt(
         f"Kubernetes version (minimum {MIN_K8S_VERSION} for EKS Auto Mode support; "
         f"default {k8s_default}",
@@ -184,10 +186,10 @@ def main():
     ssh_key = prompt(
         "Existing EC2 key pair name (optional; AWS Console > EC2 > Key Pairs). "
         "Leave blank to skip SSH access",
-        env_values.get("SSH_KEY_NAME", ""),
+        tf_values.get("ssh_key_name", ""),
     )
 
-    environment_default = env_values.get("ENVIRONMENT", "dev")
+    environment_default = tf_values.get("environment", "dev")
     environment = prompt(
         "Environment tag (choose labels like dev/test/prod to organize resources; "
         "default dev",
@@ -205,10 +207,23 @@ def main():
             print("Deployment cancelled at user request.")
             return
 
-    hapi_mode = choose_hapi_mode(env_values.get("HAPI_MODE", "general"))
+    hapi_mode = choose_hapi_mode(tf_values.get("hapi_mode", "general"))
     print(f"Selected mode: {hapi_mode}")
 
-    chart_version = env_values.get("HAPI_CHART_VERSION", "0.21.0")
+    chart_version = tf_values.get("hapi_chart_version", "0.21.0")
+
+    tf_values.update(
+        {
+            "aws_region": aws_region,
+            "cluster_name": cluster_name,
+            "environment": environment,
+            "hapi_mode": hapi_mode,
+            "ssh_key_name": ssh_key or "",
+            "k8s_version": k8s_version,
+            "hapi_chart_version": chart_version,
+        }
+    )
+    save_tfvars(tf_values)
 
     updated_env = {
         "AWS_ACCESS_KEY_ID": aws_access_key,
@@ -223,7 +238,6 @@ def main():
         "HAPI_CHART_VERSION": chart_version,
     }
 
-    save_env(updated_env)
     set_env_persistent(
         {
             "AWS_ACCESS_KEY_ID": aws_access_key,
@@ -246,6 +260,9 @@ def main():
         "TF_VAR_k8s_version": k8s_version,
         "TF_VAR_hapi_chart_version": chart_version,
     }
+    node_ami_type = tf_values.get("node_ami_type", "")
+    if node_ami_type:
+        tf_var_exports["TF_VAR_node_ami_type"] = node_ami_type
     os.environ.update(tf_var_exports)
     set_env_persistent(tf_var_exports)
 

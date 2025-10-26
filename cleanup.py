@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 from typing import Dict, Iterable, List, Optional
@@ -9,12 +10,7 @@ except ModuleNotFoundError as exc:  # pragma: no cover - dependency guard
     print("boto3 is required to run cleanup.py. Install it with `pip install boto3`.")
     raise SystemExit(1) from exc
 
-from hapi_cli_common import (
-    confirm_destruction,
-    ensure_python_version,
-    load_env,
-    prompt,
-)
+from hapi_cli_common import confirm_destruction, ensure_python_version, load_tfvars, prompt
 
 
 POLL_DELAY = 10
@@ -299,17 +295,20 @@ def delete_vpcs(ec2_client, cluster_name: str) -> None:
 def main() -> None:
     ensure_python_version()
 
-    env_values = load_env()
+    tf_values = load_tfvars()
     cluster_name = prompt(
         "Cluster name to clean (default hapi-eks-cluster)",
-        env_values.get("CLUSTER_NAME", "hapi-eks-cluster"),
+        tf_values.get("cluster_name", "hapi-eks-cluster"),
     ) or "hapi-eks-cluster"
     env_tag = prompt(
-        "Environment tag to match (default dev)", env_values.get("ENVIRONMENT", "dev")
+        "Environment tag to match (default dev)", tf_values.get("environment", "dev")
     ) or "dev"
     region = prompt(
         "AWS region (default us-east-1)",
-        env_values.get("AWS_REGION") or env_values.get("AWS_DEFAULT_REGION", "us-east-1"),
+        tf_values.get("aws_region")
+        or os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-1",
     ) or "us-east-1"
 
     print("WARNING: this will remove AWS resources tagged with the chosen environment.")
