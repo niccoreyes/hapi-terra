@@ -21,6 +21,8 @@ module "vpc" {
 data "aws_availability_zones" "available" {}
 
 locals {
+  k8s_version_numeric = tonumber(replace(var.k8s_version, ".", ""))
+
   eks_remote_access = var.ssh_key_name != "" ? {
     ec2_ssh_key = var.ssh_key_name
   } : null
@@ -30,11 +32,11 @@ locals {
     max_size              = var.node_max_capacity
     min_size              = var.node_min_capacity
     instance_types        = [var.node_instance_type]
-    capacity_type         = "ON_DEMAND"
-    ami_type              = "AL2_x86_64"
+    capacity_type          = "ON_DEMAND"
+    ami_type               = local.k8s_version_numeric >= 133 ? "AL2023_x86_64_STANDARD" : "AL2_x86_64"
     create_launch_template = local.eks_remote_access == null
     use_custom_launch_template = local.eks_remote_access == null
-    remote_access         = local.eks_remote_access
+    remote_access          = local.eks_remote_access
   }
 }
 

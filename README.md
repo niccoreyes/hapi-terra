@@ -31,6 +31,12 @@ Provision an Amazon EKS cluster and deploy the HAPI FHIR JPA server using Terraf
 ### Destroying the Environment
 Run `destroy.bat` from the same directory. The script reuses values from `.env`, confirms the action, and runs `terraform destroy`.
 
+### Manual Cleanup Helpers
+If Terraform exits partway through and leaves AWS resources behind, run `cleanup.py` (or `cleanup.bat` if you prefer the batch wrapper). The script now tears down managed node groups, the control plane, and dependent network resources in a dependency-aware order (detaching ENIs, removing custom routes, etc.), making it safe to rerun Terraform from a clean slate.
+
+### Inspecting AWS Inventory
+Use `inventory.py` (or `inventory.bat`) to print an organized snapshot of resources per service—EKS clusters/node groups, VPC components, load balancers, IAM roles, KMS keys, and CloudWatch log groups. Filtering by cluster name or `Environment` tag keeps the output readable when multiple stacks share an account.
+
 ## Manual Terraform Workflow
 If you prefer to run Terraform directly (or are on macOS/Linux):
 
@@ -79,8 +85,32 @@ terraform validate
 ## Repository Layout
 - `providers.tf`, `vpc-eks.tf`, `helm-hapi.tf`, `variables.tf`, `outputs.tf` – Terraform configuration at the repo root.
 - `deploy.bat`, `destroy.bat` – Windows helpers that wrap Terraform commands and manage a `.env` file containing the last-used inputs.
+- `cleanup.py` / `cleanup.bat` – Force-remove leftover AWS infrastructure when Terraform state is incomplete.
+- `inventory.py` / `inventory.bat` – Summarize the AWS resources (cluster, VPC, load balancers, IAM, etc.) tied to a cluster/environment.
 - `hapi-values-general.yaml`, `hapi-values-terminology.yaml` – Helm overrides for the two deployment profiles.
 - `.env` – Saved credentials and preferences (ignored by Git). Guard this file carefully and rotate credentials when needed.
+
+### Folder Structure
+```
+hapi-terra/
+  providers.tf
+  vpc-eks.tf
+  helm-hapi.tf
+  variables.tf
+  outputs.tf
+  deploy.py
+  destroy.py
+  cleanup.py
+  inventory.py
+  hapi_cli_common.py
+  hapi-values-general.yaml
+  hapi-values-terminology.yaml
+  hapi-fhir-jpaserver-<version>.tgz   # cached Helm chart artifact
+  deploy.bat / destroy.bat / cleanup.bat / inventory.bat
+  requirements.txt
+  README.md
+```
+Terraform files stay at the top level so `terraform init` and related commands can run from the repository root. Python helpers (`deploy.py`, `destroy.py`, `cleanup.py`, and `hapi_cli_common.py`) share that root so the batch files can execute them without fiddling with relative paths. The Helm values sit beside Terraform to keep chart overrides version-controlled and easy to reference during plans. The downloaded chart archive is cached locally so repeated deploys skip the GitHub download unless you delete the file or bump `hapi_chart_version`.
 
 ## Security & State Management
 - Never commit AWS credentials. The `.env` file remains local and is excluded via `.gitignore`.
@@ -95,7 +125,9 @@ terraform validate
 - **`helm_release` fails with timeout.**  
   Check EKS node readiness (`kubectl get nodes`) and confirm the Helm repository (`https://hapifhir.github.io/hapi-fhir-jpaserver-starter/`) is reachable. Re-run `terraform apply` once connectivity is restored.
 - **`Access is denied` while downloading `hapi-fhir-jpaserver-<version>.tgz`.**  
-  Windows can lock Helm’s cached chart archive between runs. The automation script now clears `.helm-cache/`, but when running Terraform manually delete the cached file under `%TEMP%\helm\repository\` (e.g. `hapi-fhir-jpaserver-0.21.0.tgz`) before retrying.
+  The deployment scripts cache the chart archive in the repository root. Delete the local `hapi-fhir-jpaserver-<version>.tgz` file and rerun `deploy.py` (or fetch it manually with `curl.exe`) if you suspect the first download was interrupted.
+- **`NodeCreationFailure: Unhealthy nodes in the kubernetes cluster`.**  
+  Kubernetes 1.33+ clusters require Amazon Linux 2023 worker AMIs. This project switches to the `AL2023_x86_64_STANDARD` AMI automatically for those versions, but if you previously applied with Kubernetes 1.33 while using AL2 workers, destroy/cleanup the stack and redeploy so the managed node group picks up the new AMI type.
 - **Authentication errors with `aws eks update-kubeconfig`.**  
   Verify your IAM user or role is mapped in the EKS `aws-auth` ConfigMap. The Terraform module enables default mappings, but custom restrictions may require manual updates.
 

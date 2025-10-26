@@ -1,6 +1,6 @@
 import sys
 import time
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional
 
 try:
     import boto3
@@ -153,18 +153,58 @@ def delete_nat_gateways(ec2_client, env_tag: str) -> None:
                     raise
 
 
+def delete_launch_templates(ec2_client, cluster_name: str, env_tag: str) -> None:
+    paginator = ec2_client.get_paginator("describe_launch_templates")
+    for page in paginator.paginate():
+        for template in page.get("LaunchTemplates", []):
+            template_id = template["LaunchTemplateId"]
+            template_name = template["LaunchTemplateName"]
+            tags = template.get("Tags", [])
+            if cluster_name not in template_name and not tag_matches(tags, "Environment", env_tag):
+                continue
+            print(f"Deleting launch template {template_name} ({template_id})...")
+            try:
+                ec2_client.delete_launch_template(LaunchTemplateId=template_id)
+            except ClientError as err:
+                print(f"Warning: could not delete launch template {template_name}: {err}")
+
+
 def delete_route_tables(ec2_client, env_tag: str) -> None:
     route_tables = ec2_client.describe_route_tables(
         Filters=[{"Name": "tag:Environment", "Values": [env_tag]}]
     ).get("RouteTables", [])
     for rt in route_tables:
         rt_id = rt["RouteTableId"]
+        associations = rt.get("Associations", [])
+        is_main = any(assoc.get("Main") for assoc in associations)
+        if is_main:
+            print(f"Skipping main route table {rt_id}; it will be removed with the VPC.")
+            continue
         print(f"Deleting route table {rt_id}...")
-        for association in rt.get("Associations", []):
+        for association in associations:
             if association.get("Main"):
                 continue
             assoc_id = association["RouteTableAssociationId"]
+            print(f"  Disassociating {assoc_id}...")
             ec2_client.disassociate_route_table(AssociationId=assoc_id)
+        for route in rt.get("Routes", []):
+            if route.get("Origin") == "CreateRouteTable" or route.get("GatewayId") == "local":
+                continue
+            params: Dict[str, str] = {"RouteTableId": rt_id}
+            destination = route.get("DestinationCidrBlock")
+            destination_v6 = route.get("DestinationIpv6CidrBlock")
+            if destination:
+                params["DestinationCidrBlock"] = destination
+            elif destination_v6:
+                params["DestinationIpv6CidrBlock"] = destination_v6
+            else:
+                continue
+            try:
+                print(f"  Removing route {destination or destination_v6}...")
+                ec2_client.delete_route(**params)
+            except ClientError as err:
+                if err.response["Error"]["Code"] not in {"InvalidRoute.NotFound", "InvalidRouteTableID.NotFound"}:
+                    raise
         ec2_client.delete_route_table(RouteTableId=rt_id)
 
 
@@ -176,6 +216,30 @@ def delete_network_interfaces(ec2_client, env_tag: str) -> None:
         for eni in page.get("NetworkInterfaces", []):
             eni_id = eni["NetworkInterfaceId"]
             status = eni.get("Status")
+            attachment = eni.get("Attachment")
+            if attachment and status != "available":
+                attachment_id = attachment.get("AttachmentId")
+                if attachment_id:
+                    print(f"Detaching ENI {eni_id} (attachment {attachment_id})...")
+                    try:
+                        ec2_client.detach_network_interface(
+                            AttachmentId=attachment_id, Force=True
+                        )
+                    except ClientError as err:
+                        print(f"Warning: could not detach ENI {eni_id}: {err}")
+                        continue
+                    # Allow AWS time to process the detach.
+                    while True:
+                        time.sleep(POLL_DELAY)
+                        current = ec2_client.describe_network_interfaces(NetworkInterfaceIds=[eni_id])
+                        ni_list = current.get("NetworkInterfaces", [])
+                        if not ni_list:
+                            break
+                        current_status = ni_list[0].get("Status")
+                        if current_status == "available":
+                            status = "available"
+                            break
+                        print(f"  Waiting for ENI {eni_id} to become available (status={current_status})...")
             if status != "available":
                 print(f"Skipping ENI {eni_id} (status={status}); detach it manually if needed.")
                 continue
@@ -265,6 +329,7 @@ def main() -> None:
         delete_load_balancers(elbv2_client, env_tag)
         delete_oidc_provider(iam_client, cluster_name)
         delete_iam_roles(iam_client, cluster_name, env_tag)
+        delete_launch_templates(ec2_client, cluster_name, env_tag)
         delete_nat_gateways(ec2_client, env_tag)
         delete_route_tables(ec2_client, env_tag)
         delete_network_interfaces(ec2_client, env_tag)

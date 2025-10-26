@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, List
 
 ENV_FILE = Path(".env")
-MIN_K8S_VERSION = "1.32"
+MIN_K8S_VERSION = "1.34"
 
 _RESET = "\033[0m"
 _TAG_COLORS = {
