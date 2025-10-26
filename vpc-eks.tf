@@ -51,6 +51,8 @@ module "eks" {
   kubernetes_version                       = var.k8s_version
   vpc_id                                   = module.vpc.vpc_id
   subnet_ids                               = module.vpc.private_subnets
+  endpoint_public_access                   = true
+  endpoint_private_access                  = false
   enable_cluster_creator_admin_permissions = true
 
   eks_managed_node_groups = {
