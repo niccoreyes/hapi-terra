@@ -18,3 +18,8 @@ output "hapi_service" {
   value       = { for mode, release in helm_release.hapi_fhir : mode => release.status }
   description = "Helm release status by deployment mode."
 }
+
+output "node_ami_type" {
+  value       = local.eks_node_ami_type
+  description = "AMI family used for the default EKS managed node group."
+}

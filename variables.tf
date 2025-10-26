@@ -13,13 +13,36 @@ variable "cluster_name" {
 variable "k8s_version" {
   description = "Kubernetes version"
   type        = string
-  default     = "1.34"
+  default     = "1.29"
 }
 
 variable "node_instance_type" {
   description = "EC2 instance type for worker nodes"
   type        = string
   default     = "t3.medium"
+}
+
+variable "node_ami_type" {
+  description = "Override the managed node group AMI type when you need a specific Amazon EKS optimized image family"
+  type        = string
+  default     = ""
+
+  validation {
+    condition = var.node_ami_type == "" || contains([
+      "AL2_x86_64",
+      "AL2_x86_64_GPU",
+      "AL2_ARM_64",
+      "AL2_ARM_64_GPU",
+      "BOTTLEROCKET_x86_64",
+      "BOTTLEROCKET_x86_64_NVIDIA",
+      "BOTTLEROCKET_ARM_64",
+      "BOTTLEROCKET_ARM_64_NVIDIA",
+      "AL2023_x86_64_STANDARD",
+      "AL2023_x86_64_GPU",
+      "AL2023_ARM_64_STANDARD"
+    ], var.node_ami_type)
+    error_message = "Valid values for node_ami_type are empty string (automatic) or one of the Amazon-provided EKS managed node group AMI identifiers."
+  }
 }
 
 variable "node_desired_capacity" {

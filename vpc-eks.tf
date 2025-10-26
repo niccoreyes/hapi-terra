@@ -21,22 +21,24 @@ module "vpc" {
 data "aws_availability_zones" "available" {}
 
 locals {
-  k8s_version_numeric = tonumber(replace(var.k8s_version, ".", ""))
+  k8s_version_numeric  = tonumber(replace(var.k8s_version, ".", ""))
+  eks_default_ami_type = local.k8s_version_numeric >= 133 ? "AL2023_x86_64_STANDARD" : "AL2_x86_64"
+  eks_node_ami_type    = var.node_ami_type != "" ? var.node_ami_type : local.eks_default_ami_type
 
   eks_remote_access = var.ssh_key_name != "" ? {
     ec2_ssh_key = var.ssh_key_name
   } : null
 
   eks_node_group = {
-    desired_size          = var.node_desired_capacity
-    max_size              = var.node_max_capacity
-    min_size              = var.node_min_capacity
-    instance_types        = [var.node_instance_type]
-    capacity_type          = "ON_DEMAND"
-    ami_type               = local.k8s_version_numeric >= 133 ? "AL2023_x86_64_STANDARD" : "AL2_x86_64"
-    create_launch_template = local.eks_remote_access == null
+    desired_size               = var.node_desired_capacity
+    max_size                   = var.node_max_capacity
+    min_size                   = var.node_min_capacity
+    instance_types             = [var.node_instance_type]
+    capacity_type              = "ON_DEMAND"
+    ami_type                   = local.eks_node_ami_type
+    create_launch_template     = local.eks_remote_access == null
     use_custom_launch_template = local.eks_remote_access == null
-    remote_access          = local.eks_remote_access
+    remote_access              = local.eks_remote_access
   }
 }
 
@@ -44,14 +46,28 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  name               = var.cluster_name
-  kubernetes_version = var.k8s_version
-  vpc_id                          = module.vpc.vpc_id
-  subnet_ids                      = module.vpc.private_subnets
+  name                                     = var.cluster_name
+  kubernetes_version                       = var.k8s_version
+  vpc_id                                   = module.vpc.vpc_id
+  subnet_ids                               = module.vpc.private_subnets
   enable_cluster_creator_admin_permissions = true
 
   eks_managed_node_groups = {
     default = local.eks_node_group
+  }
+
+  addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent                 = true
+      resolve_conflicts_on_create = "OVERWRITE"
+      resolve_conflicts_on_update = "OVERWRITE"
+    }
   }
 
   tags = {

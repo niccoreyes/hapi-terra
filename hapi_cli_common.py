@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Dict, List
 
 ENV_FILE = Path(".env")
-MIN_K8S_VERSION = "1.34"
+# Keep aligned with the highest Kubernetes version Amazon EKS currently supports.
+MIN_K8S_VERSION = "1.29"
 
 _RESET = "\033[0m"
 _TAG_COLORS = {

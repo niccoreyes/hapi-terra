@@ -68,6 +68,7 @@ terraform validate
 
 ## Customizing the Deployment
 - Edit `variables.tf` (or override via `.tfvars`) to adjust instance type, node scaling, cluster name, and HAPI chart version.
+- Override `node_ami_type` when you need a specific Amazon EKS–optimized node OS (for example, set `TF_VAR_node_ami_type=AL2_x86_64` to stay on AL2 for older workloads, or pick a Bottlerocket variant). Leave it blank to let Terraform choose the correct AL2/AL2023 image based on your Kubernetes version, and run `terraform output node_ami_type` to confirm what the deployment used.
 - Provide an EC2 key pair name if you need SSH access to the EKS managed node group. The Terraform module wires that key into the managed node group’s remote access configuration.
 - Modify `hapi-values-general.yaml` or `hapi-values-terminology.yaml` to tune application-level configuration. The YAML files map 1:1 with the chart structure—keep keys lowercase with hyphenated file naming.
 - To enable both HAPI profiles at once, set `hapi_mode = "both"` (supported in the CLI prompts and Terraform variables).
@@ -81,6 +82,11 @@ terraform validate
    `kubectl get svc -A` and look for the `LoadBalancer` address of the HAPI service.
 4. Optionally render manifests without installing:  
    `helm template hapi-fhir ./ --values hapi-values-general.yaml`
+
+### Capturing Endpoints for Documentation
+- Record the control plane endpoint from Terraform outputs: `terraform output cluster_endpoint`.
+- Capture node IPs (internal/private) if you need to reference them for troubleshooting: `kubectl get nodes -o wide`. EKS nodes are not exposed publicly; reach the application through the Kubernetes Service instead of direct node HTTP calls.
+- Retrieve the HAPI ingress address for client testing: `kubectl get svc -n default -l app.kubernetes.io/name=hapi-fhir-jpaserver -o jsonpath="{.items[0].status.loadBalancer.ingress[0].hostname}"`. Document this hostname/URL for downstream consumers.
 
 ## Repository Layout
 - `providers.tf`, `vpc-eks.tf`, `helm-hapi.tf`, `variables.tf`, `outputs.tf` – Terraform configuration at the repo root.
@@ -127,7 +133,7 @@ Terraform files stay at the top level so `terraform init` and related commands c
 - **`Access is denied` while downloading `hapi-fhir-jpaserver-<version>.tgz`.**  
   The deployment scripts cache the chart archive in the repository root. Delete the local `hapi-fhir-jpaserver-<version>.tgz` file and rerun `deploy.py` (or fetch it manually with `curl.exe`) if you suspect the first download was interrupted.
 - **`NodeCreationFailure: Unhealthy nodes in the kubernetes cluster`.**  
-  Kubernetes 1.33+ clusters require Amazon Linux 2023 worker AMIs. This project switches to the `AL2023_x86_64_STANDARD` AMI automatically for those versions, but if you previously applied with Kubernetes 1.33 while using AL2 workers, destroy/cleanup the stack and redeploy so the managed node group picks up the new AMI type.
+  This commonly appears when the requested Kubernetes control plane version is newer than what Amazon EKS currently supports. Make sure `TF_VAR_k8s_version` (or the value stored in `.env`) matches an active EKS release—`1.29` is the default baked into the scripts. After correcting the version, re-run `terraform apply`. If you need to pin a specific image family, set `TF_VAR_node_ami_type` accordingly before applying.
 - **Authentication errors with `aws eks update-kubeconfig`.**  
   Verify your IAM user or role is mapped in the EKS `aws-auth` ConfigMap. The Terraform module enables default mappings, but custom restrictions may require manual updates.
 
