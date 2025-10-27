@@ -4,13 +4,17 @@ replicaCount: 1
 fullnameOverride: "hapi-fhir-general"
 
 image:
+  registry: docker.io
   repository: hapiproject/hapi
-  tag: v8.2.0-1
+  tag: v8.2.0-1@sha256:e85ded02f60e25a66e6d9423ea71f3ebc9494e3a69bdd7d7dbfa31b8aa5b2fe9
   pullPolicy: IfNotPresent
 
 service:
   type: LoadBalancer
   port: 8080
+
+nodeSelector:
+  role: general
 
 resources:
   requests:
@@ -28,7 +32,19 @@ extraEnv:
   - name: "HAPI_FHIR_SERVER_ADDRESS"
     value: "http://0.0.0.0:8080/fhir"
 
-# make embedded Postgres database name explicit for this release
+# make embedded Postgres database considerations explicit for this release
 postgresql:
   auth:
     database: "fhir_general"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: gp3
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi

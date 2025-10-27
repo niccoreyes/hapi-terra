@@ -1,17 +1,37 @@
-
-replicaCount: 1
+replicaCount: 2
 
 # ensure Kubernetes resource names are unique for this release
 fullnameOverride: "hapi-fhir-terminology"
 
 image:
+  registry: docker.io
   repository: hapiproject/hapi
-  tag: v8.2.0-1
+  tag: v8.2.0-1@sha256:e85ded02f60e25a66e6d9423ea71f3ebc9494e3a69bdd7d7dbfa31b8aa5b2fe9
   pullPolicy: IfNotPresent
 
 service:
   type: LoadBalancer
   port: 8080
+
+nodeSelector:
+  role: terminology
+
+tolerations:
+  - key: "role"
+    operator: "Equal"
+    value: "terminology"
+    effect: "NoSchedule"
+
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: "app.kubernetes.io/instance"
+              operator: In
+              values:
+                - hapi-fhir-terminology
+        topologyKey: "kubernetes.io/hostname"
 
 resources:
   requests:
@@ -33,7 +53,19 @@ extraEnv:
   - name: "HAPI_FHIR_IMPLEMENTATION_DESCRIPTION"
     value: "Terminology-focused FHIR server with limited resources."
 
-# make embedded Postgres database name explicit for this release
+# make embedded Postgres database considerations explicit for this release
 postgresql:
   auth:
     database: "fhir_terminology"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: gp3
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi

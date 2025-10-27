@@ -30,17 +30,42 @@ locals {
     ec2_ssh_key = var.ssh_key_name
   } : null
 
-  eks_node_group = {
-    desired_size               = var.node_desired_capacity
-    max_size                   = var.node_max_capacity
-    min_size                   = var.node_min_capacity
-    instance_types             = [var.node_instance_type]
+  eks_common_node_group = {
     capacity_type              = "ON_DEMAND"
     ami_type                   = local.eks_node_ami_type
     create_launch_template     = local.eks_remote_access == null
     use_custom_launch_template = local.eks_remote_access == null
     remote_access              = local.eks_remote_access
   }
+
+  eks_default_node_group = merge(local.eks_common_node_group, {
+    desired_size   = var.node_desired_capacity
+    max_size       = var.node_max_capacity
+    min_size       = var.node_min_capacity
+    instance_types = [var.node_instance_type]
+    labels = {
+      workload = "hapi-general"
+      role     = "general"
+    }
+  })
+
+  eks_terminology_node_group = merge(local.eks_common_node_group, {
+    desired_size   = var.terminology_node_desired_capacity
+    max_size       = var.terminology_node_max_capacity
+    min_size       = var.terminology_node_min_capacity
+    instance_types = [var.terminology_node_instance_type]
+    labels = {
+      workload = "hapi-terminology"
+      role     = "terminology"
+    }
+    taints = {
+      terminology = {
+        key    = "role"
+        value  = "terminology"
+        effect = "NO_SCHEDULE"
+      }
+    }
+  })
 }
 
 module "eks" {
@@ -56,7 +81,8 @@ module "eks" {
   enable_cluster_creator_admin_permissions = true
 
   eks_managed_node_groups = {
-    default = local.eks_node_group
+    default     = local.eks_default_node_group
+    terminology = local.eks_terminology_node_group
   }
 
   addons = {

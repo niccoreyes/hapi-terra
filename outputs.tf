@@ -23,3 +23,11 @@ output "node_ami_type" {
   value       = local.eks_node_ami_type
   description = "AMI family used for the default EKS managed node group."
 }
+
+output "terminology_node_configuration" {
+  description = "Labels and taints applied to the terminology-dedicated managed node group."
+  value = {
+    labels = local.eks_terminology_node_group.labels
+    taints = local.eks_terminology_node_group.taints
+  }
+}

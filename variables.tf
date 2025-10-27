@@ -22,6 +22,12 @@ variable "node_instance_type" {
   default     = "t3.medium"
 }
 
+variable "terminology_node_instance_type" {
+  description = "Instance type for the terminology-dedicated managed node group"
+  type        = string
+  default     = "t3.large"
+}
+
 variable "node_ami_type" {
   description = "Override the managed node group AMI type when you need a specific Amazon EKS optimized image family"
   type        = string
@@ -58,6 +64,24 @@ variable "node_min_capacity" {
 variable "node_max_capacity" {
   type    = number
   default = 3
+}
+
+variable "terminology_node_desired_capacity" {
+  description = "Desired node count for the terminology managed node group"
+  type        = number
+  default     = 2
+}
+
+variable "terminology_node_min_capacity" {
+  description = "Minimum node count for the terminology managed node group"
+  type        = number
+  default     = 2
+}
+
+variable "terminology_node_max_capacity" {
+  description = "Maximum node count for the terminology managed node group"
+  type        = number
+  default     = 4
 }
 
 variable "ssh_key_name" {
