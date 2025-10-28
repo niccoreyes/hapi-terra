@@ -138,11 +138,21 @@ def set_env_persistent(pairs: Dict[str, str]) -> None:
 
 
 def prompt(message: str, default: str = "", display_default: str = "") -> str:
+    auto_accept = os.environ.get("HAPI_AUTO_ACCEPT_DEFAULT", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     suffix = ""
     if default:
         shown = display_default if display_default else default
         suffix = f" [{shown}]"
-    response = input(f"{message}{suffix}: ").strip()
+    prompt_text = f"{message}{suffix}: "
+    if auto_accept:
+        print(f"{prompt_text}(auto)")
+        return default or ""
+    response = input(prompt_text).strip()
     if not response and default:
         return default
     return response

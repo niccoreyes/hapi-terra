@@ -1,3 +1,4 @@
+import argparse
 import os
 import shutil
 import sys
@@ -125,7 +126,24 @@ def choose_hapi_mode(default: str) -> str:
     return choice_to_mode.get(selection, "general")
 
 
-def main():
+def parse_args(argv=None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Provision the HAPI FHIR EKS infrastructure."
+    )
+    parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Accept defaults from environment/terraform.auto.tfvars without prompting.",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    if args.auto:
+        os.environ["HAPI_AUTO_ACCEPT_DEFAULT"] = "1"
+        print("Auto mode enabled; using defaults without interactive prompts.")
+
     ensure_python_version()
     print("===============================================")
     print("  HAPI FHIR - AWS EKS Terraform Deployment")
