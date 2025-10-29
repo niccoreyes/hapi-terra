@@ -46,5 +46,9 @@ resource "helm_release" "hapi_fhir" {
   atomic            = true
   dependency_update = true
 
-  depends_on = [module.eks]
+  depends_on = [
+    module.eks,
+    aws_eks_addon.ebs_csi,
+    kubernetes_storage_class_v1.gp3
+  ]
 }
